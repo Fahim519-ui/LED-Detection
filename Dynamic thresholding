@@ -1,0 +1,66 @@
+import cv2
+import numpy as np
+
+def check_led_state(image, roi, color_channel='all', intensity_threshold=200, min_bright_area=5):
+    """
+    Check if an LED is ON/OFF based on intensity in a specified ROI.
+    
+    Args:
+        image (numpy.ndarray): Input BGR image from the camera.
+        roi (tuple): Region of interest (x, y, w, h) around the LED.
+        color_channel (str): 'red', 'green', 'blue', or 'all' (default).
+        intensity_threshold (int): Brightness value to classify ON (0-255).
+        min_bright_area (int): Minimum bright pixels to confirm ON state.
+        
+    Returns:
+        str: "ON" or "OFF"
+    """
+    # Extract ROI
+    x, y, w, h = roi
+    roi_img = image[y:y+h, x:x+w]
+    
+    # Process based on color channel
+    if color_channel == 'red':
+        channel = roi_img[:, :, 2]  # Red channel in BGR
+    elif color_channel == 'green':
+        channel = roi_img[:, :, 1]  # Green channel
+    elif color_channel == 'blue':
+        channel = roi_img[:, :, 0]  # Blue channel
+    else:  # 'all' channels (convert to grayscale)
+        channel = cv2.cvtColor(roi_img, cv2.COLOR_BGR2GRAY)
+    
+    # Create binary mask of bright pixels
+    _, binary_mask = cv2.threshold(channel, intensity_threshold, 255, cv2.THRESH_BINARY)
+    
+    # Count bright pixels and determine state
+    bright_pixels = cv2.countNonZero(binary_mask)
+    return "ON" if bright_pixels >= min_bright_area else "OFF"
+
+# Example usage
+if __name__ == "__main__":
+    # Initialize camera (replace 0 with video file/path)
+    cap = cv2.VideoCapture(0)
+    
+    # Define ROI (x, y, width, height) - calibrate for your panel!
+    led_roi = (100, 150, 30, 30)  # Example coordinates
+    
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+            
+        # Check LED state
+        state = check_led_state(frame, led_roi, color_channel='red', intensity_threshold=220)
+        
+        # Visualize
+        x, y, w, h = led_roi
+        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        cv2.putText(frame, f"LED: {state}", (10, 30), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        
+        cv2.imshow("LED State Detection", frame)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+            
+    cap.release()
+    cv2.destroyAllWindows()

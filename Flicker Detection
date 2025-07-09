@@ -1,0 +1,59 @@
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
+
+# Simulate brightness signal over time for one LED
+def simulate_pwm_flicker(frequency_hz, frame_rate=240, duration_s=1.0):
+    t = np.linspace(0, duration_s, int(frame_rate * duration_s))
+    signal = 0.5 + 0.5 * np.sign(np.sin(2 * np.pi * frequency_hz * t))
+    noise = np.random.normal(0, 0.05, signal.shape)
+    return signal + noise, t
+
+# FFT analysis
+def detect_frequency(signal, frame_rate):
+    fft = np.fft.rfft(signal - np.mean(signal))
+    freqs = np.fft.rfftfreq(len(signal), 1 / frame_rate)
+    peak_freq = freqs[np.argmax(np.abs(fft))]
+    return peak_freq
+
+# ML stub: classify LED as OK (0) or degraded (1)
+def classify_led(signal):
+    features = [
+        np.mean(signal),
+        np.std(signal),
+        np.max(signal) - np.min(signal)
+    ]
+    features = scaler.transform([features])
+    return clf.predict(features)[0]
+
+# Simulate training (replace with real data!)
+X_train = np.array([
+    [0.5, 0.1, 1.0],  # healthy
+    [0.4, 0.25, 0.6], # degraded
+    [0.45, 0.2, 0.7], # degraded
+    [0.55, 0.05, 1.0] # healthy
+])
+y_train = [0, 1, 1, 0]
+
+scaler = StandardScaler().fit(X_train)
+X_train_scaled = scaler.transform(X_train)
+clf = RandomForestClassifier().fit(X_train_scaled, y_train)
+
+# Simulate and detect
+signal, t = simulate_pwm_flicker(500)  # Simulate 500 Hz flicker
+freq = detect_frequency(signal, 240)
+
+print(f"Detected Frequency: {freq:.2f} Hz")
+
+status = classify_led(signal)
+print("LED Health Status:", "OK" if status == 0 else "DEGRADED")
+
+# Plot signal
+plt.plot(t, signal)
+plt.title("LED Brightness Over Time")
+plt.xlabel("Time (s)")
+plt.ylabel("Brightness")
+plt.grid()
+plt.show()

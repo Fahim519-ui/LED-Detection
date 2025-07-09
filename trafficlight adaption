@@ -1,0 +1,64 @@
+import cv2
+import numpy as np
+
+# 1. Define LED ROIs (x, y, w, h) based on panel layout
+led_rois = [
+    (100, 200, 30, 30),  # LED 1
+    (150, 200, 30, 30),  # LED 2
+    (200, 200, 30, 30)   # LED 3
+]
+
+# 2. Set HSV thresholds for colors (adjust empirically)
+color_ranges = {
+    "red":    ([0, 100, 100], [10, 255, 255], [160, 100, 100], [180, 255, 255]),
+    "green":  ([40, 50, 50], [70, 255, 255]),
+    "blue":   ([90, 50, 50], [120, 255, 255]),
+    "yellow": ([20, 100, 100], [30, 255, 255])
+}
+
+# 3. Process each frame
+def process_frame(frame):
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    results = {}
+    
+    for i, (x, y, w, h) in enumerate(led_rois):
+        led_roi = hsv[y:y+h, x:x+w]
+        
+        # Check if LED is ON: >50% pixels above brightness threshold
+        v_channel = led_roi[:, :, 2]
+        if np.mean(v_channel) < 30:  # V threshold for "OFF"
+            results[f"LED_{i+1}"] = "OFF"
+            continue
+        
+        # Detect color
+        for color, ranges in color_ranges.items():
+            if color == "red":
+                mask1 = cv2.inRange(led_roi, *ranges[:2])
+                mask2 = cv2.inRange(led_roi, *ranges[2:])
+                mask = cv2.bitwise_or(mask1, mask2)
+            else:
+                mask = cv2.inRange(led_roi, *ranges)
+            
+            if cv2.countNonZero(mask) > 0.5 * w * h:  >50% pixels match
+                results[f"LED_{i+1}"] = color
+                break
+    
+    return results
+
+# 4. Main loop
+cap = cv2.VideoCapture(0)  # Or industrial camera feed
+while True:
+    ret, frame = cap.read()
+    if not ret: break
+    
+    results = process_frame(frame)
+    print(results)  # Output: {"LED_1": "green", "LED_2": "OFF", ...}
+    
+    # Visualize (optional)
+    for i, (x, y, w, h) in enumerate(led_rois):
+        cv2.rectangle(frame, (x, y), (x+w, y+h), (0, 255, 0), 2)
+    cv2.imshow("Panel", frame)
+    if cv2.waitKey(1) == 27: break
+
+cap.release()
+cv2.destroyAllWindows()
